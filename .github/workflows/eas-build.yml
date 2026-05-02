@@ -226,7 +226,8 @@ jobs:
           - EAS source: $ANDROID_URL" \
             --latest
 
-      - name: Update README and push
+      - name: Update README badge and push
+        continue-on-error: true
         env:
           ANDROID_URL: ${{ needs.build.outputs.android_url }}
           TAG: ${{ steps.tag.outputs.tag }}
