@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { type ProfileSettings, type Profile, HOME_URL } from '@/types';
+import { type ProfileSettings, type Profile } from '@/types';
 
 const AD_TRACKER_DOMAINS = [
   'doubleclick.net', 'googlesyndication.com', 'googletagmanager.com',
