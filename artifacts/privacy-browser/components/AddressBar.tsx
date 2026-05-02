@@ -85,7 +85,13 @@ export function AddressBar({
         ? decodeURIComponent(url.split('q=')[1] ?? '')
         : url,
     );
-    setTimeout(() => inputRef.current?.selectAll?.(), 50);
+    setTimeout(() => {
+      const len = (url.startsWith('https://www.google.com/search?q=')
+        ? decodeURIComponent(url.split('q=')[1] ?? '')
+        : url
+      ).length;
+      inputRef.current?.setSelection?.(0, len);
+    }, 50);
   }, [url]);
 
   const handleBlur = useCallback(() => {
