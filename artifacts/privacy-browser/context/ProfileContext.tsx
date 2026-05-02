@@ -7,6 +7,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { PROFILE_COLORS, type Profile, type ProxyConfig } from '@/types';
 import { USER_AGENTS } from '@/constants/userAgents';
 
@@ -202,7 +203,13 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     ],
   );
 
-  if (!loaded) return null;
+  if (!loaded) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 }
 
