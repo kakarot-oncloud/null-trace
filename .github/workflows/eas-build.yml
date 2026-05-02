@@ -226,27 +226,30 @@ jobs:
           - EAS source: $ANDROID_URL" \
             --latest
 
-      - name: Update README download badge
+      - name: Update README and push
         env:
           ANDROID_URL: ${{ needs.build.outputs.android_url }}
-        run: |
-          BADGE="[![Download APK](https://img.shields.io/badge/Download-Android%20APK-3DDC84?logo=android&logoColor=white)]($ANDROID_URL)"
-          MARKER="<!-- LATEST_BUILD -->"
-          python3 -c "
-          import re
-          content = open('README.md').read()
-          new = re.sub(r'<!-- LATEST_BUILD -->.*', '<!-- LATEST_BUILD -->\n$BADGE', content, flags=re.DOTALL)
-          if '<!-- LATEST_BUILD -->' not in new:
-              new = new.replace('<!-- LATEST_BUILD -->', '<!-- LATEST_BUILD -->\n$BADGE')
-          open('README.md', 'w').write(new)
-          print('README updated')
-          "
-
-      - name: Commit README update
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Pull latest first (before modifying any file)
           git pull --rebase origin main
+
+          # Now update README
+          BADGE="[![Download APK](https://img.shields.io/badge/Download-Android%20APK-3DDC84?logo=android&logoColor=white)](https://github.com/kakarot-oncloud/null-trace/releases/latest)"
+          python3 -c "
+          import re, os
+          badge = os.environ['BADGE']
+          content = open('README.md').read()
+          new = re.sub(r'<!-- LATEST_BUILD -->[^\n]*\n[^\n]*', '<!-- LATEST_BUILD -->\n' + badge, content)
+          if new == content:
+              new = re.sub(r'<!-- LATEST_BUILD -->[^\n]*', '<!-- LATEST_BUILD -->\n' + badge, content)
+          open('README.md', 'w').write(new)
+          print('README updated')
+          " BADGE="$BADGE"
+
           git add README.md
-          git diff --staged --quiet || git commit -m "ci: update README with latest Android APK download link [skip ci]"
+          git diff --staged --quiet || git commit -m "ci: update README — release $TAG [skip ci]"
           git push
