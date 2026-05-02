@@ -95,31 +95,54 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Link EAS project
+      - name: Create / link EAS project
         working-directory: artifacts/privacy-browser
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas init --non-interactive --force
 
       - name: Build Android (preview APK)
         id: build_android
         if: ${{ github.event.inputs.platform != 'ios' }}
         working-directory: artifacts/privacy-browser
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          BUILD_OUTPUT=$(eas build --platform android --profile preview --non-interactive --json 2>/dev/null || eas build --platform android --profile preview --non-interactive)
-          echo "$BUILD_OUTPUT"
-          BUILD_URL=$(echo "$BUILD_OUTPUT" | grep -o 'https://expo.dev/artifacts/[^"]*' | head -1 || true)
+          eas build --platform android --profile preview --non-interactive --json > /tmp/build_output.json 2>&1 || true
+          cat /tmp/build_output.json
+          BUILD_URL=$(python3 -c "
+          import json, sys
+          try:
+            data = json.load(open('/tmp/build_output.json'))
+            if isinstance(data, list) and data:
+              print(data[0].get('artifacts', {}).get('buildUrl', '') or data[0].get('buildUrl', ''))
+            elif isinstance(data, dict):
+              print(data.get('artifacts', {}).get('buildUrl', '') or data.get('buildUrl', ''))
+          except: pass
+          " 2>/dev/null || true)
           echo "android_url=$BUILD_URL" >> $GITHUB_OUTPUT
 
       - name: Build iOS (simulator)
         if: ${{ github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'all' }}
         working-directory: artifacts/privacy-browser
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas build --platform ios --profile preview --non-interactive
 
       - name: Get latest Android build URL
         id: get_url
-        if: ${{ github.event.inputs.platform != 'ios' }}
+        if: ${{ github.event.inputs.platform != 'ios' && steps.build_android.outputs.android_url == '' }}
         working-directory: artifacts/privacy-browser
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          LATEST=$(eas build:list --platform android --limit 1 --json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0].get('artifacts',{}).get('buildUrl','') if d else '')" 2>/dev/null || true)
+          LATEST=$(eas build:list --platform android --limit 1 --json 2>/dev/null | python3 -c "
+          import sys, json
+          try:
+            d = json.load(sys.stdin)
+            print(d[0].get('artifacts', {}).get('buildUrl', '') if d else '')
+          except: pass
+          " 2>/dev/null || true)
           echo "android_url=$LATEST" >> $GITHUB_OUTPUT
           echo "Latest Android build: $LATEST"
 

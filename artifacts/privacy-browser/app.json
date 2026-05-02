@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "Privacy Browser",
-    "slug": "privacy-browser",
-    "owner": "kakarot-oncloud",
+    "name": "Null Trace",
+    "slug": "null-trace",
+    "owner": "student48",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "privacy-browser",
+    "scheme": "nulltrace",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {

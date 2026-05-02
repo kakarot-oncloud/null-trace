@@ -45,15 +45,32 @@ server.on('upgrade', (req, socket, head) => {
   socket.on('error', () => targetSocket.destroy());
 });
 
+function clearMetroCache() {
+  const fs = require('fs');
+  const path = require('path');
+  const cacheDirs = [
+    path.join(__dirname, '..', '.metro-cache'),
+    path.join(__dirname, '..', 'node_modules', '.cache', 'metro'),
+    path.join(__dirname, '..', '.expo', 'metro-cache'),
+  ];
+  for (const dir of cacheDirs) {
+    if (fs.existsSync(dir)) {
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+    }
+  }
+}
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[proxy] Listening on port ${PORT}, forwarding to Metro on ${METRO_PORT}`);
+
+  clearMetroCache();
 
   const env = {
     ...process.env,
     PORT: String(METRO_PORT),
   };
 
-  const expo = spawn('pnpm', ['exec', 'expo', 'start', '--localhost', `--port`, String(METRO_PORT)], {
+  const expo = spawn('pnpm', ['exec', 'expo', 'start', '--localhost', `--port`, String(METRO_PORT), '--clear'], {
     env,
     stdio: 'inherit',
     cwd: process.cwd(),
