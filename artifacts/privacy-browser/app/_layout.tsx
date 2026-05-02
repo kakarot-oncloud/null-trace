@@ -9,8 +9,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -39,6 +39,24 @@ function RootLayoutNav() {
   );
 }
 
+function AppProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <AppLockProvider>
+      <ProfileProvider>
+        <SettingsProvider>
+          <BrowserProvider>
+            <DownloadsProvider>
+              <ProfileSyncGate>
+                {children}
+              </ProfileSyncGate>
+            </DownloadsProvider>
+          </BrowserProvider>
+        </SettingsProvider>
+      </ProfileProvider>
+    </AppLockProvider>
+  );
+}
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
@@ -55,29 +73,24 @@ export default function RootLayout() {
 
   if (!fontsLoaded && !fontError) return null;
 
-  return (
+  const inner = (
     <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
-            <KeyboardProvider>
-              <AppLockProvider>
-                <ProfileProvider>
-                  <SettingsProvider>
-                    <BrowserProvider>
-                      <DownloadsProvider>
-                        <ProfileSyncGate>
-                          <RootLayoutNav />
-                        </ProfileSyncGate>
-                      </DownloadsProvider>
-                    </BrowserProvider>
-                  </SettingsProvider>
-                </ProfileProvider>
-              </AppLockProvider>
-            </KeyboardProvider>
+            <AppProviders>
+              <RootLayoutNav />
+            </AppProviders>
           </GestureHandlerRootView>
         </QueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );
+
+  if (Platform.OS === "web") {
+    return inner;
+  }
+
+  const { KeyboardProvider } = require("react-native-keyboard-controller");
+  return <KeyboardProvider>{inner}</KeyboardProvider>;
 }
