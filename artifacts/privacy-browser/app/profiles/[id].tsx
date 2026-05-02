@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useProfiles } from '@/context/ProfileContext';
 import { useColors } from '@/hooks/useColors';
-import { PROFILE_COLORS, type Profile, type ProxyConfig } from '@/types';
+import { PROFILE_COLORS, type Profile } from '@/types';
 import { COMMON_LANGUAGES, COMMON_TIMEZONES, USER_AGENTS } from '@/constants/userAgents';
 
 export default function EditProfileScreen() {
