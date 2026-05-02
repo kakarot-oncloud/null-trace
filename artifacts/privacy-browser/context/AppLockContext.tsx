@@ -8,7 +8,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { Platform } from 'react-native';
+import { ActivityIndicator, Platform, View } from 'react-native';
 
 const PIN_KEY = 'app_pin';
 const PIN_ENABLED_KEY = 'app_pin_enabled';
@@ -149,7 +149,13 @@ export function AppLockProvider({ children }: { children: React.ReactNode }) {
     ],
   );
 
-  if (!initialized) return null;
+  if (!initialized) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
 
   return <AppLockContext.Provider value={value}>{children}</AppLockContext.Provider>;
 }
