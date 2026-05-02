@@ -39,6 +39,15 @@ export default function BrowserScreen() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [isSecure, setIsSecure] = useState(true);
 
+  // Refs for back handler — always current without stale closures
+  const canGoBackRef = useRef(false);
+  const menuVisibleRef = useRef(false);
+  const tabsVisibleRef = useRef(false);
+
+  // Keep modal refs in sync with state
+  useEffect(() => { menuVisibleRef.current = menuVisible; }, [menuVisible]);
+  useEffect(() => { tabsVisibleRef.current = tabsVisible; }, [tabsVisible]);
+
   // Sync nav state when active tab changes
   const prevTabIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -47,35 +56,37 @@ export default function BrowserScreen() {
       const url = activeTab?.url ?? HOME_URL;
       setNavUrl(url);
       setNavKey((k) => k + 1);
+      // Reset canGoBack ref when switching tabs
+      canGoBackRef.current = activeTab?.canGoBack ?? false;
     }
   }, [activeTabId, activeTab]);
 
-  // Android hardware back button — navigate WebView history instead of closing the app
+  // Android hardware back button — uses refs so the value is ALWAYS current
   useEffect(() => {
     if (Platform.OS !== 'android') return;
 
     const onBackPress = (): boolean => {
       // Dismiss modals first (highest priority)
-      if (menuVisible) {
+      if (menuVisibleRef.current) {
         setMenuVisible(false);
         return true;
       }
-      if (tabsVisible) {
+      if (tabsVisibleRef.current) {
         setTabsVisible(false);
         return true;
       }
       // Navigate back inside the WebView when it has history
-      if (activeTab?.canGoBack && !isOnHomePage(activeTab?.url ?? '')) {
+      if (canGoBackRef.current) {
         webViewRef.current?.goBack?.();
         return true;
       }
-      // No WebView history left — let Android handle it (minimize / exit)
+      // No history left — let Android handle it (minimize / exit)
       return false;
     };
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [menuVisible, tabsVisible, activeTab?.canGoBack, activeTab?.url]);
+  }, []); // Registered once — refs keep it always current
 
   const handleNavigate = useCallback(
     (url: string) => {
@@ -90,6 +101,9 @@ export default function BrowserScreen() {
 
   const handleNavStateChange = useCallback(
     (state: { url: string; title: string; canGoBack: boolean; canGoForward: boolean }) => {
+      // Update ref immediately — no render cycle needed for back handler
+      canGoBackRef.current = state.canGoBack;
+
       if (activeTabId) {
         updateTab(activeTabId, {
           url: state.url,
