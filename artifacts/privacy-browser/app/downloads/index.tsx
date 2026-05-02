@@ -15,7 +15,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useDownloads } from '@/context/DownloadsContext';
-import { useProfiles } from '@/context/ProfileContext';
 import { useColors } from '@/hooks/useColors';
 import { type Download } from '@/types';
 
@@ -31,7 +30,6 @@ export default function DownloadsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { downloads, updateDownload, removeDownload, clearCompleted } = useDownloads();
-  const { activeProfile } = useProfiles();
   const s = styles(colors);
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 

@@ -18,6 +18,10 @@ import { useSettings } from '@/context/SettingsContext';
 import { useColors } from '@/hooks/useColors';
 import { HOME_URL } from '@/types';
 
+function isOnHomePage(url: string): boolean {
+  return !url || url === HOME_URL || url === 'about:blank' || url === '';
+}
+
 export default function BrowserScreen() {
   const colors = useColors();
   const colorScheme = useColorScheme();
@@ -34,9 +38,6 @@ export default function BrowserScreen() {
   const [tabsVisible, setTabsVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [isSecure, setIsSecure] = useState(true);
-
-  const isOnHomePage = (url: string) =>
-    !url || url === HOME_URL || url === 'about:blank' || url === '';
 
   // Sync nav state when active tab changes
   const prevTabIdRef = useRef<string | null>(null);
