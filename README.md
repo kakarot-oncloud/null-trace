@@ -13,6 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS-lightgrey?logo=android&logoColor=white)](https://expo.dev)
 <!-- LATEST_BUILD -->
+[![Download APK](https://img.shields.io/badge/Download-Android%20APK-3DDC84?logo=android&logoColor=white)](https://expo.dev/artifacts/eas/kqLapjBsJgKoaCSWoyPcoP.apk)
 
 **Built with Expo · React Native · TypeScript · EAS**
 
