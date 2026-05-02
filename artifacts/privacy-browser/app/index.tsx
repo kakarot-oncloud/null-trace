@@ -1,7 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, Share, StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
+import { BackHandler, Platform, Share, StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AddressBar } from '@/components/AddressBar';
 import { BrowserToolbar } from '@/components/BrowserToolbar';
@@ -49,6 +49,33 @@ export default function BrowserScreen() {
       setNavKey((k) => k + 1);
     }
   }, [activeTabId, activeTab]);
+
+  // Android hardware back button — navigate WebView history instead of closing the app
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const onBackPress = (): boolean => {
+      // Dismiss modals first (highest priority)
+      if (menuVisible) {
+        setMenuVisible(false);
+        return true;
+      }
+      if (tabsVisible) {
+        setTabsVisible(false);
+        return true;
+      }
+      // Navigate back inside the WebView when it has history
+      if (activeTab?.canGoBack && !isOnHomePage(activeTab?.url ?? '')) {
+        webViewRef.current?.goBack?.();
+        return true;
+      }
+      // No WebView history left — let Android handle it (minimize / exit)
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [menuVisible, tabsVisible, activeTab?.canGoBack, activeTab?.url]);
 
   const handleNavigate = useCallback(
     (url: string) => {
