@@ -78,21 +78,15 @@ export function AddressBar({
     opacity: isLoading ? 1 : withTiming(0, { duration: 500 }),
   }));
 
-  const handleFocus = useCallback(() => {
-    setEditing(true);
-    setInputValue(
-      url.startsWith('https://www.google.com/search?q=')
+  // Pre-fill input value whenever editing starts
+  useEffect(() => {
+    if (editing) {
+      const value = url.startsWith('https://www.google.com/search?q=')
         ? decodeURIComponent(url.split('q=')[1] ?? '')
-        : url,
-    );
-    setTimeout(() => {
-      const len = (url.startsWith('https://www.google.com/search?q=')
-        ? decodeURIComponent(url.split('q=')[1] ?? '')
-        : url
-      ).length;
-      inputRef.current?.setSelection?.(0, len);
-    }, 50);
-  }, [url]);
+        : url;
+      setInputValue(value);
+    }
+  }, [editing, url]);
 
   const handleBlur = useCallback(() => {
     setEditing(false);
@@ -104,6 +98,11 @@ export function AddressBar({
     setEditing(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, [inputValue, onNavigate]);
+
+  // Open the keyboard when the pill is tapped
+  const handlePillPress = useCallback(() => {
+    setEditing(true);
+  }, []);
 
   const s = styles(colors);
   const isHome = url === 'about:blank' || url === '' || url === 'https://www.google.com';
@@ -128,14 +127,13 @@ export function AddressBar({
       </TouchableOpacity>
 
       {/* URL pill */}
-      <Pressable style={[s.urlPill, editing && s.urlPillFocused]} onPress={() => inputRef.current?.focus()}>
+      <Pressable style={[s.urlPill, editing && s.urlPillFocused]} onPress={handlePillPress}>
         {editing ? (
           <TextInput
             ref={inputRef}
             style={s.urlInput}
             value={inputValue}
             onChangeText={setInputValue}
-            onFocus={handleFocus}
             onBlur={handleBlur}
             onSubmitEditing={handleSubmit}
             autoCapitalize="none"
@@ -143,6 +141,7 @@ export function AddressBar({
             keyboardType="url"
             returnKeyType="go"
             selectTextOnFocus
+            autoFocus
             placeholderTextColor={colors.mutedForeground}
             placeholder="Search or enter address"
           />

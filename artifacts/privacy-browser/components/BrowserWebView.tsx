@@ -12,6 +12,23 @@ const AD_TRACKER_DOMAINS = [
   'segment.com', 'amplitude.com', 'yandex-team.ru', 'mc.yandex.ru',
 ];
 
+// File extensions that should be downloaded rather than opened in the WebView
+const DOWNLOAD_EXTENSIONS = [
+  '.pdf', '.zip', '.apk', '.tar', '.gz', '.rar', '.7z',
+  '.mp3', '.mp4', '.avi', '.mkv', '.mov', '.webm',
+  '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+  '.csv', '.epub', '.dmg', '.exe', '.pkg',
+];
+
+function isDownloadUrl(url: string): boolean {
+  try {
+    const pathname = new URL(url).pathname.toLowerCase();
+    return DOWNLOAD_EXTENSIONS.some((ext) => pathname.endsWith(ext));
+  } catch {
+    return false;
+  }
+}
+
 function buildInjectedJS(settings: ProfileSettings, profile: Profile): string {
   const parts: string[] = [];
 
@@ -137,6 +154,13 @@ export function BrowserWebView({
     (request: { url: string }) => {
       const reqUrl = request.url;
 
+      // Intercept downloadable file URLs on Android (onFileDownload is iOS-only)
+      if (Platform.OS === 'android' && isDownloadUrl(reqUrl)) {
+        const filename = reqUrl.split('/').pop()?.split('?')[0] ?? 'download';
+        onDownloadRequest(reqUrl, filename);
+        return false;
+      }
+
       // HTTPS-first mode
       if (settings.httpsFirstMode && reqUrl.startsWith('http://') && !reqUrl.startsWith('http://localhost')) {
         const httpsUrl = reqUrl.replace('http://', 'https://');
@@ -157,7 +181,7 @@ export function BrowserWebView({
 
       return true;
     },
-    [settings, webViewRef],
+    [settings, webViewRef, onDownloadRequest],
   );
 
   const handleNavChange = useCallback(
@@ -225,6 +249,7 @@ export function BrowserWebView({
       onError={handleError}
       onHttpError={handleError}
       onFileDownload={(event: any) => {
+        // iOS: fires natively for downloadable files
         const { downloadUrl } = event.nativeEvent;
         const filename = downloadUrl.split('/').pop()?.split('?')[0] ?? 'download';
         onDownloadRequest(downloadUrl, filename);
