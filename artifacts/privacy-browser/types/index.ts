@@ -51,6 +51,7 @@ export interface Download {
   filename: string;
   status: 'pending' | 'downloading' | 'completed' | 'failed';
   progress: number;
+  size?: number;
   localPath?: string;
   error?: string;
   startedAt: number;
