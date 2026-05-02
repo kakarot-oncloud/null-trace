@@ -30,7 +30,7 @@ export default function DownloadsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { downloads, addDownload, updateDownload, removeDownload, clearCompleted } = useDownloads();
+  const { downloads, updateDownload, removeDownload, clearCompleted } = useDownloads();
   const { activeProfile } = useProfiles();
   const s = styles(colors);
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -59,7 +59,7 @@ export default function DownloadsScreen() {
         await updateDownload(d.id, { status: 'failed', error: e.message ?? 'Unknown error' });
       }
     });
-  }, []);
+  }, [downloads, updateDownload]);
 
   const handleOpen = async (d: Download) => {
     if (d.localPath && Platform.OS !== 'web') {

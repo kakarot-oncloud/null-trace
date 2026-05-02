@@ -29,7 +29,6 @@ export default function BrowserScreen() {
   const { addDownload } = useDownloads();
 
   const webViewRef = useRef<any>(null);
-  const addressBarRef = useRef<{ focus: () => void }>(null);
   const [navUrl, setNavUrl] = useState(activeTab?.url ?? HOME_URL);
   const [navKey, setNavKey] = useState(0);
   const [tabsVisible, setTabsVisible] = useState(false);

@@ -30,7 +30,7 @@ export default function BookmarksScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { bookmarks, removeBookmark, history, clearHistory, createTab, switchTab, tabs } = useBrowser();
+  const { bookmarks, removeBookmark, history, clearHistory, createTab } = useBrowser();
   const [tab, setTab] = useState<'bookmarks' | 'history'>('bookmarks');
   const s = styles(colors);
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
