@@ -15,6 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
+      "bundleIdentifier": "com.kakarot.nulltrace",
       "infoPlist": {
         "NSCameraUsageDescription": "Allow camera access for sites that request it",
         "NSMicrophoneUsageDescription": "Allow microphone access for sites that request it",
@@ -23,6 +24,7 @@
       }
     },
     "android": {
+      "package": "com.kakarot.nulltrace",
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
