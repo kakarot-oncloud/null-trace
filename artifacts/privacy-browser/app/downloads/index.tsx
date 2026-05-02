@@ -40,8 +40,9 @@ export default function DownloadsScreen() {
     if (Platform.OS === 'web') return;
     const pending = downloads.filter((d) => d.status === 'pending');
     pending.forEach(async (d) => {
-      if (!FileSystem.documentDirectory) return;
-      const dest = FileSystem.documentDirectory + d.filename;
+      const docDir = (FileSystem as any).documentDirectory as string | null;
+      if (!docDir) return;
+      const dest = docDir + d.filename;
       await updateDownload(d.id, { status: 'downloading', progress: 0 });
       try {
         const downloadRes = FileSystem.createDownloadResumable(d.url, dest, {}, (prog) => {
