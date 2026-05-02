@@ -18,9 +18,35 @@ on:
           - all
 
 jobs:
+  lint:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+          cache-dependency-path: artifacts/privacy-browser/package.json
+
+      - name: Install dependencies
+        working-directory: artifacts/privacy-browser
+        run: npm install
+
+      - name: Run TypeScript check
+        working-directory: artifacts/privacy-browser
+        run: npx tsc --noEmit
+
   build:
     name: EAS Build (${{ github.event.inputs.platform || 'android' }})
     runs-on: ubuntu-latest
+    needs: lint
+    if: github.event_name != 'pull_request'
+    outputs:
+      android_url: ${{ steps.get_url.outputs.android_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -43,33 +69,67 @@ jobs:
         run: npm install
 
       - name: Build Android (preview APK)
-        if: ${{ github.event.inputs.platform == 'android' || github.event.inputs.platform == '' || github.event_name == 'push' }}
+        id: build_android
+        if: ${{ github.event.inputs.platform != 'ios' }}
         working-directory: artifacts/privacy-browser
-        run: eas build --platform android --profile preview --non-interactive
+        run: |
+          BUILD_OUTPUT=$(eas build --platform android --profile preview --non-interactive --json 2>/dev/null || eas build --platform android --profile preview --non-interactive)
+          echo "$BUILD_OUTPUT"
+          BUILD_URL=$(echo "$BUILD_OUTPUT" | grep -o 'https://expo.dev/artifacts/[^"]*' | head -1 || true)
+          echo "android_url=$BUILD_URL" >> $GITHUB_OUTPUT
 
       - name: Build iOS (simulator)
         if: ${{ github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'all' }}
         working-directory: artifacts/privacy-browser
         run: eas build --platform ios --profile preview --non-interactive
 
-  lint:
-    name: Type Check
+      - name: Get latest Android build URL
+        id: get_url
+        if: ${{ github.event.inputs.platform != 'ios' }}
+        working-directory: artifacts/privacy-browser
+        run: |
+          LATEST=$(eas build:list --platform android --limit 1 --json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0].get('artifacts',{}).get('buildUrl','') if d else '')" 2>/dev/null || true)
+          echo "android_url=$LATEST" >> $GITHUB_OUTPUT
+          echo "Latest Android build: $LATEST"
+
+  update-readme:
+    name: Update README with Download Link
     runs-on: ubuntu-latest
+    needs: build
+    if: ${{ github.event_name != 'pull_request' && needs.build.outputs.android_url != '' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
         with:
-          node-version: 20.x
-          cache: npm
-          cache-dependency-path: artifacts/privacy-browser/package.json
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install dependencies
-        working-directory: artifacts/privacy-browser
-        run: npm install
+      - name: Update README download badge
+        env:
+          ANDROID_URL: ${{ needs.build.outputs.android_url }}
+        run: |
+          if [ -z "$ANDROID_URL" ]; then
+            echo "No build URL found, skipping README update"
+            exit 0
+          fi
 
-      - name: Run TypeScript check
-        working-directory: artifacts/privacy-browser
-        run: npx tsc --noEmit
+          # Replace or insert the download badge line in README
+          BADGE="[![Download APK](https://img.shields.io/badge/Download-Android%20APK-3DDC84?logo=android&logoColor=white)]($ANDROID_URL)"
+          MARKER="<!-- LATEST_BUILD -->"
+
+          if grep -q "$MARKER" README.md; then
+            # Update existing marker line
+            sed -i "s|${MARKER}.*|${MARKER} ${BADGE}|" README.md
+          else
+            # Insert after the badges block (after the Platform badge line)
+            sed -i "/Platform-Android/a ${MARKER} ${BADGE}" README.md
+          fi
+
+          echo "Updated README with: $BADGE"
+
+      - name: Commit README update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git diff --staged --quiet || git commit -m "ci: update README with latest Android APK download link [skip ci]"
+          git push
