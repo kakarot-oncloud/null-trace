@@ -1,4 +1,4 @@
-import React, { forwardRef, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { type ProfileSettings, type Profile, HOME_URL } from '@/types';
 

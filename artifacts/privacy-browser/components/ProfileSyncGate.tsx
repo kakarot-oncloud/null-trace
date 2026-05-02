@@ -15,7 +15,7 @@ export function ProfileSyncGate({ children }: { children: React.ReactNode }) {
       loadProfile(activeProfile.id);
       setCurrentProfileId(activeProfile.id);
     }
-  }, [activeProfile?.id]);
+  }, [activeProfile?.id, loadProfile, setCurrentProfileId]);
 
   return <>{children}</>;
 }
