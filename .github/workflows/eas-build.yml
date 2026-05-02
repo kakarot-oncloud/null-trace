@@ -102,7 +102,6 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          # Separate stderr so JSON is clean; capture build ID immediately
           eas build --platform android --profile preview --non-interactive --json \
             2>/tmp/build_stderr.txt | tee /tmp/build_output.json
           echo "--- Build stderr ---"
@@ -122,7 +121,6 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          # Try parsing URL from build JSON output first
           APK_URL=$(python3 -c "
           import json, sys
           try:
@@ -141,8 +139,7 @@ jobs:
             sys.stderr.write(str(e) + '\n')
           " 2>/tmp/parse_err.txt || true)
 
-          # Fallback: query eas build:list for the most recent finished build
-          if [ -z "\$APK_URL" ]; then
+          if [ -z "$APK_URL" ]; then
             echo "JSON parse got nothing, falling back to eas build:list"
             cat /tmp/parse_err.txt || true
             APK_URL=$(eas build:list --platform android --limit 5 --json 2>/dev/null | python3 -c "
@@ -167,8 +164,8 @@ jobs:
           echo "android_url=$APK_URL" >> $GITHUB_OUTPUT
           echo "Latest Android APK: $APK_URL"
 
-  update-readme:
-    name: Update README with Download Link
+  release:
+    name: Publish GitHub Release
     runs-on: ubuntu-latest
     needs: build
     if: ${{ github.event_name != 'pull_request' && needs.build.outputs.android_url != '' }}
@@ -180,40 +177,76 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Download APK from Expo
+        env:
+          ANDROID_URL: ${{ needs.build.outputs.android_url }}
+        run: |
+          echo "Downloading APK from: $ANDROID_URL"
+          curl -L -o null-trace.apk "$ANDROID_URL"
+          ls -lh null-trace.apk
+
+      - name: Generate release tag
+        id: tag
+        run: |
+          TAG="build-$(date +'%Y%m%d')-$(echo '${{ github.sha }}' | cut -c1-7)"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Tag: $TAG"
+
+      - name: Delete existing release with same date tag (if any)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          gh release delete "$TAG" --yes 2>/dev/null || true
+          git push --delete origin "refs/tags/$TAG" 2>/dev/null || true
+
+      - name: Create GitHub Release and upload APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          ANDROID_URL: ${{ needs.build.outputs.android_url }}
+        run: |
+          gh release create "$TAG" null-trace.apk \
+            --title "Null Trace $(date +'%Y-%m-%d') (build $(echo '${{ github.sha }}' | cut -c1-7))" \
+            --notes "## Null Trace Android APK
+
+          **Commit:** \`${{ github.sha }}\`
+          **Branch:** \`${{ github.ref_name }}\`
+          **Built:** $(date +'%Y-%m-%d %H:%M UTC')
+
+          ### Install
+          1. Download \`null-trace.apk\` below
+          2. On your Android device: **Settings → Security → Allow unknown apps**
+          3. Open the APK file and tap Install
+
+          ### Build details
+          - Bundle ID: \`com.kakarot.nulltrace\`
+          - Profile: preview (APK)
+          - Expo SDK 54 · React Native 0.81.5 · New Architecture enabled
+          - EAS source: $ANDROID_URL" \
+            --latest
+
       - name: Update README download badge
         env:
           ANDROID_URL: ${{ needs.build.outputs.android_url }}
         run: |
-          if [ -z "$ANDROID_URL" ]; then
-            echo "No build URL found, skipping README update"
-            exit 0
-          fi
-
           BADGE="[![Download APK](https://img.shields.io/badge/Download-Android%20APK-3DDC84?logo=android&logoColor=white)]($ANDROID_URL)"
           MARKER="<!-- LATEST_BUILD -->"
-
-          if grep -q "$MARKER" README.md; then
-            # Replace the entire marker line (including any existing badge after it)
-            python3 -c "
-          import sys, re
+          python3 -c "
+          import re
           content = open('README.md').read()
-          marker = '<!-- LATEST_BUILD -->'
-          badge = '''$BADGE'''
-          # Replace marker + everything up to next newline with marker + newline + badge
-          new = re.sub(r'<!-- LATEST_BUILD -->.*', marker + '\n' + badge, content)
+          new = re.sub(r'<!-- LATEST_BUILD -->.*', '<!-- LATEST_BUILD -->\n$BADGE', content, flags=re.DOTALL)
+          if '<!-- LATEST_BUILD -->' not in new:
+              new = new.replace('<!-- LATEST_BUILD -->', '<!-- LATEST_BUILD -->\n$BADGE')
           open('README.md', 'w').write(new)
           print('README updated')
           "
-          else
-            sed -i "/Platform-Android/a ${MARKER}\n${BADGE}" README.md
-          fi
-
-          echo "Updated README with: $BADGE"
 
       - name: Commit README update
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
           git add README.md
           git diff --staged --quiet || git commit -m "ci: update README with latest Android APK download link [skip ci]"
           git push
