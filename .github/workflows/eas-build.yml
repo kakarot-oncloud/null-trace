@@ -95,12 +95,6 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Create / link EAS project
-        working-directory: artifacts/privacy-browser
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas init --non-interactive --force
-
       - name: Build Android (preview APK)
         id: build_android
         if: ${{ github.event.inputs.platform != 'ios' }}
@@ -108,19 +102,11 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          eas build --platform android --profile preview --non-interactive --json > /tmp/build_output.json 2>&1 || true
-          cat /tmp/build_output.json
-          BUILD_URL=$(python3 -c "
-          import json, sys
-          try:
-            data = json.load(open('/tmp/build_output.json'))
-            if isinstance(data, list) and data:
-              print(data[0].get('artifacts', {}).get('buildUrl', '') or data[0].get('buildUrl', ''))
-            elif isinstance(data, dict):
-              print(data.get('artifacts', {}).get('buildUrl', '') or data.get('buildUrl', ''))
-          except: pass
-          " 2>/dev/null || true)
-          echo "android_url=$BUILD_URL" >> $GITHUB_OUTPUT
+          # Separate stderr so JSON is clean; capture build ID immediately
+          eas build --platform android --profile preview --non-interactive --json \
+            2>/tmp/build_stderr.txt | tee /tmp/build_output.json
+          echo "--- Build stderr ---"
+          cat /tmp/build_stderr.txt || true
 
       - name: Build iOS (simulator)
         if: ${{ github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'all' }}
@@ -131,20 +117,55 @@ jobs:
 
       - name: Get latest Android build URL
         id: get_url
-        if: ${{ github.event.inputs.platform != 'ios' && steps.build_android.outputs.android_url == '' }}
+        if: ${{ github.event.inputs.platform != 'ios' }}
         working-directory: artifacts/privacy-browser
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          LATEST=$(eas build:list --platform android --limit 1 --json 2>/dev/null | python3 -c "
+          # Try parsing URL from build JSON output first
+          APK_URL=$(python3 -c "
+          import json, sys
+          try:
+            data = json.load(open('/tmp/build_output.json'))
+            builds = data if isinstance(data, list) else [data]
+            for b in builds:
+              arts = b.get('artifacts') or {}
+              url = (arts.get('applicationArchiveUrl') or
+                     arts.get('buildUrl') or
+                     b.get('buildUrl') or
+                     b.get('applicationArchiveUrl') or '')
+              if url:
+                print(url)
+                sys.exit(0)
+          except Exception as e:
+            sys.stderr.write(str(e) + '\n')
+          " 2>/tmp/parse_err.txt || true)
+
+          # Fallback: query eas build:list for the most recent finished build
+          if [ -z "\$APK_URL" ]; then
+            echo "JSON parse got nothing, falling back to eas build:list"
+            cat /tmp/parse_err.txt || true
+            APK_URL=$(eas build:list --platform android --limit 5 --json 2>/dev/null | python3 -c "
           import sys, json
           try:
-            d = json.load(sys.stdin)
-            print(d[0].get('artifacts', {}).get('buildUrl', '') if d else '')
-          except: pass
+            builds = json.load(sys.stdin)
+            for b in builds:
+              if b.get('status') in ('FINISHED', 'finished'):
+                arts = b.get('artifacts') or {}
+                url = (arts.get('applicationArchiveUrl') or
+                       arts.get('buildUrl') or
+                       b.get('buildUrl') or
+                       b.get('applicationArchiveUrl') or '')
+                if url:
+                  print(url)
+                  sys.exit(0)
+          except Exception as e:
+            sys.stderr.write(str(e) + '\n')
           " 2>/dev/null || true)
-          echo "android_url=$LATEST" >> $GITHUB_OUTPUT
-          echo "Latest Android build: $LATEST"
+          fi
+
+          echo "android_url=$APK_URL" >> $GITHUB_OUTPUT
+          echo "Latest Android APK: $APK_URL"
 
   update-readme:
     name: Update README with Download Link
@@ -170,9 +191,19 @@ jobs:
           MARKER="<!-- LATEST_BUILD -->"
 
           if grep -q "$MARKER" README.md; then
-            sed -i "s|${MARKER}.*|${MARKER} ${BADGE}|" README.md
+            # Replace the entire marker line (including any existing badge after it)
+            python3 -c "
+          import sys, re
+          content = open('README.md').read()
+          marker = '<!-- LATEST_BUILD -->'
+          badge = '''$BADGE'''
+          # Replace marker + everything up to next newline with marker + newline + badge
+          new = re.sub(r'<!-- LATEST_BUILD -->.*', marker + '\n' + badge, content)
+          open('README.md', 'w').write(new)
+          print('README updated')
+          "
           else
-            sed -i "/Platform-Android/a ${MARKER} ${BADGE}" README.md
+            sed -i "/Platform-Android/a ${MARKER}\n${BADGE}" README.md
           fi
 
           echo "Updated README with: $BADGE"
